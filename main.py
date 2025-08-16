@@ -20,12 +20,11 @@ async def fetch_page(request: Request):
     Fetch a webpage using Playwright and return its Markdown version.
     """
     # Full URL
-    url = str(request.url)
-    # Hostname
-    hostname = request.url.hostname
-
-    print(f"Full URL: {url}")
-    print(f"Hostname: {hostname}")
+    # url = str(request.url)
+    url = request.query_params.get("url")
+    if not url:
+        return {"error": "Missing 'url' query parameter"}
+    logger.info(f"Full URL: {url}")
 
     # Launch headless browser
     async with async_playwright() as p:
