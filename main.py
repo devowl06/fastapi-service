@@ -15,13 +15,17 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+@app.get("/")
+async def root():
+    return {"message": "Welcome to the FastAPI Markdown Converter. To use this, hit the /fetch endpoint with a URL parameter. example: /fetch?url=https://example.com"}
+
 @app.get("/fetch")
 async def fetch_page(request: Request):
     """
     Fetch a webpage using Playwright and return its Markdown version.
     """
     # Full URL
-    # url = str(request.url)
+    # url = str(request.url) # please note: use this for production and comment out the below logic for url
     url = request.query_params.get("url")
     if not url:
         return {"error": "Missing 'url' query parameter"}
