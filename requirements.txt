@@ -12,6 +12,7 @@ greenlet==3.2.4
 h11==0.16.0
 humanfriendly==10.0
 idna==3.10
+lxml==6.0.0
 magika==0.6.2
 markdownify==1.2.0
 markitdown==0.1.2
