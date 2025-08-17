@@ -4,6 +4,7 @@ from markitdown import MarkItDown
 from bs4 import BeautifulSoup
 import tempfile
 import logging
+import boto3
 import os
 
 # Configure logging
@@ -14,6 +15,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
+# Setup R2 client
+s3_client = boto3.client(
+    "s3",
+    endpoint_url=os.getenv("R2_ENDPOINT_URL"),
+    aws_access_key_id=os.getenv("R2_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.getenv("R2_SECRET_ACCESS_KEY"),
+)
+
+R2_BUCKET = os.getenv("R2_BUCKET_NAME")
+
 
 @app.get("/")
 async def root():
@@ -30,6 +42,21 @@ async def fetch_page(request: Request):
     if not url:
         return {"error": "Missing 'url' query parameter"}
     logger.info(f"Full URL: {url}")
+
+    object_key = f"{url.replace('://', '_').replace('/', '_')}.md"
+
+    # Try to get from R2
+    try:
+        logger.info(f"Checking R2 for {object_key}...")
+        response = s3_client.get_object(Bucket=R2_BUCKET, Key=object_key)
+        cached_markdown = response["Body"].read().decode("utf-8")
+        logger.info(f"Cache hit for {url}, returning from R2.")
+        return {"url": url, "markdown": cached_markdown}
+    except s3_client.exceptions.NoSuchKey:
+        logger.info(f"No cache found for {url}, generating fresh content.")
+    except Exception as e:
+        logger.warning(f"Error checking R2: {e}")
+
 
     html = ""
 
@@ -105,7 +132,21 @@ async def fetch_page(request: Request):
             except Exception as cleanup_err:
                 logger.warning(f"Failed to remove temporary file {tmp_file_path}: {cleanup_err}")
 
+    markdown_content = markdown_doc.text_content
+
+    try:
+        logger.info(f"Uploading {object_key} to R2...")
+        s3_client.put_object(
+            Bucket=R2_BUCKET,
+            Key=object_key,
+            Body=markdown_content.encode("utf-8"),
+            ContentType="text/markdown",
+        )
+        logger.info("Upload successful.")
+    except Exception as e:
+        logger.error(f"Failed to upload to R2: {e}")
+
     return {
         "url": url,
-        "markdown": markdown_doc.text_content
+        "markdown": markdown_content
     }
